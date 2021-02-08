@@ -11,9 +11,9 @@ public class MultipleSubmissionsOptions extends BaseOptions {
     private Integer assignmentId;
     private Map<String, StudentSubmissionOption> studentSubmissionOptionMap;
 
-    public MultipleSubmissionsOptions(String objectId, Integer assignemnetId, Map<String, StudentSubmissionOption> studentSubmissionOptionMap) {
+    public MultipleSubmissionsOptions(String objectId, Integer assignmentId, Map<String, StudentSubmissionOption> studentSubmissionOptionMap) {
         this.objectId = objectId;
-        this.assignmentId = assignemnetId;
+        this.assignmentId = assignmentId;
         this.studentSubmissionOptionMap = studentSubmissionOptionMap;
     }
 

@@ -14,7 +14,7 @@ import java.util.List;
 public class Submission extends BaseCanvasModel implements Serializable {
     private static final long serialVersionUID = 2L;
 
-    private Integer id;
+    private Long id;
     private Integer assignmentId;
     private Assignment assignment;
     private Course course;
@@ -37,11 +37,11 @@ public class Submission extends BaseCanvasModel implements Serializable {
     private Boolean excused;
     private String workflowState;
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
