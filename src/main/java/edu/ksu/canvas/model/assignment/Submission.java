@@ -36,6 +36,7 @@ public class Submission extends BaseCanvasModel implements Serializable {
     private Boolean assigmentVisible;
     private Boolean excused;
     private String workflowState;
+    private Boolean missing;
 
     public Long getId() {
         return id;
@@ -213,5 +214,9 @@ public class Submission extends BaseCanvasModel implements Serializable {
     public void setWorkflowState(String workflowState) {
         this.workflowState = workflowState;
     }
+
+    public Boolean getMissing() { return missing; }
+
+    public void setMissing(Boolean missing) { this.missing = missing; }
 
 }

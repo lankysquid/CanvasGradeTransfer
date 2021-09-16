@@ -18,7 +18,7 @@ public class QuizSubmission extends BaseCanvasModel implements Serializable {
     private Integer id;
     private Integer quizId;
     private Integer userId;
-    private Integer submissionId;
+    private Long submissionId;
     private String startedAt;
     private String finishedAt;
     private String endAt;
@@ -56,11 +56,11 @@ public class QuizSubmission extends BaseCanvasModel implements Serializable {
         this.userId = userId;
     }
 
-    public Integer getSubmissionId() {
+    public Long getSubmissionId() {
         return submissionId;
     }
 
-    public void setSubmissionId(Integer submissionId) {
+    public void setSubmissionId(Long submissionId) {
         this.submissionId = submissionId;
     }
 

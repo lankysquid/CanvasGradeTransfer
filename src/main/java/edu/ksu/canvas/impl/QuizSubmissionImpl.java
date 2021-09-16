@@ -40,6 +40,7 @@ public class QuizSubmissionImpl extends BaseImpl<QuizSubmission, QuizSubmissionR
     public QuizSubmissionResponse getQuizSubmissions(final GetQuizSubmissionsOptions options) throws IOException {
         final String url = buildCanvasUrl("courses/" + options.getCourseId() + "/quizzes/" + options.getQuizId() + "/submissions", options.getOptionsMap());
         final List<Response> responses = canvasMessenger.getFromCanvas(oauthToken, url);
+        LOG.info("Ditto");
         final QuizSubmissionWrapper wrapper = parseQuizSubmissionResponses(responses);
         return new QuizSubmissionResponse(wrapper.getQuizSubmissions(), wrapper.getUsers(), wrapper.getQuizzes());
     }
