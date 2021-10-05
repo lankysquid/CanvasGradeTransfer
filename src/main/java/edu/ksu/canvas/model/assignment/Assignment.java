@@ -5,6 +5,7 @@ import edu.ksu.canvas.annotation.CanvasObject;
 import edu.ksu.canvas.model.BaseCanvasModel;
 
 import java.io.Serializable;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -415,6 +416,10 @@ public class Assignment extends BaseCanvasModel implements Serializable{
 
     public void setAssignmentVisibility(List<String> assignmentVisibility) {
         this.assignmentVisibility = assignmentVisibility;
+    }
+
+    public static class Comparators{
+        public static final Comparator<Assignment> NAME = (Assignment a1, Assignment a2) -> a1.getName().compareTo(a2.getName());
     }
 
     public class ExternalToolTagAttribute implements Serializable {

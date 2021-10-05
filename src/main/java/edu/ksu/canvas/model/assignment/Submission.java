@@ -7,6 +7,7 @@ import edu.ksu.canvas.model.Course;
 import edu.ksu.canvas.model.User;
 
 import java.io.Serializable;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -218,5 +219,10 @@ public class Submission extends BaseCanvasModel implements Serializable {
     public Boolean getMissing() { return missing; }
 
     public void setMissing(Boolean missing) { this.missing = missing; }
+
+    public static class Comparators {
+
+    }
+
 
 }

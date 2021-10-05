@@ -1,7 +1,6 @@
 package edu.ksu.canvas;
 
 import edu.ksu.canvas.interfaces.*;
-import edu.ksu.canvas.model.Account;
 import edu.ksu.canvas.model.Course;
 import edu.ksu.canvas.model.User;
 import edu.ksu.canvas.model.assignment.*;
@@ -10,7 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
+// Static imports to protect sensitive data
 import static edu.ksu.canvas.Tokens.PS_TOKEN;
 import static edu.ksu.canvas.Tokens.ECR_TOKEN;
 import static edu.ksu.canvas.Tokens.PS_COURSE_ID;
@@ -37,30 +38,35 @@ import static edu.ksu.canvas.Tokens.FIRST_SEM_ASSIGNMENTS;
  */
 public class TestLauncher {
 
-
-    private static HashMap<Long,Long> categoryMap = new HashMap<>(3);
     private static final Logger LOG = LoggerFactory.getLogger(TestLauncher.class);
+    private static HashMap<Long,Long> categoryMap = new HashMap<>(3);
+    private static CanvasApiFactory apiFactory;
+    private static CourseReader courseReader;
+    private static Course ecrCourse;
+    private static AssignmentReader assignmentReader;
+    private static List<Assignment> assignments;
+    private static AssignmentReader edAssingmentReader;
+    private static List<Assignment> edAssignments;
+    private static HashMap<Integer, Integer> userMap;
+    private static SubmissionReader submissionReader;
+    private static SubmissionReader edSubmissionReader;
+    private static SubmissionWriter submissionWriter;
+    private static List<Submission> submissions;
+    private static List<Submission> edSubmissions;
+    private static Map<String, MultipleSubmissionsOptions.StudentSubmissionOption> submissionsMap;
 
     public static void main(String[] args) {
         try {
-            //getRootAccount();
-            getOwnCourses();
+            transferGrades();
         } catch (Exception var5) {
             LOG.error("Problem while executing example methods", var5);
         }
     }
 
-    public static void getRootAccount() throws IOException {
-        CanvasApiFactory apiFactory = new CanvasApiFactory(ECR_URL);
-        AccountReader acctReader = (AccountReader) apiFactory.getReader(AccountReader.class, ECR_TOKEN);
-        Account rootAccount = (Account)acctReader.getSingleAccount("1").get();
-        LOG.info("Got account from Canvas: " + rootAccount.getName());
-    }
-
-    public static void getOwnCourses() throws IOException {
-        CanvasApiFactory apiFactory = new CanvasApiFactory(ECR_URL);
-        CourseReader courseReader = (CourseReader)apiFactory.getReader(CourseReader.class, ECR_TOKEN);
-        Course ecrCourse = courseReader.getSingleCourse(new GetSingleCourseOptions(ECR_COURSE_ID)).get();
+    public static void initialize() throws IOException {
+        apiFactory = new CanvasApiFactory(ECR_URL);
+        courseReader = (CourseReader)apiFactory.getReader(CourseReader.class, ECR_TOKEN);
+        ecrCourse = courseReader.getSingleCourse(new GetSingleCourseOptions(ECR_COURSE_ID)).get();
 
         LOG.info("ECR course found " + ecrCourse.getName());
 
@@ -70,13 +76,21 @@ public class TestLauncher {
 
         LOG.info("Edhesive course found " + edhesiveCourse.getName());
 
-        AssignmentReader assignmentReader = (AssignmentReader) apiFactory.getReader(AssignmentReader.class, ECR_TOKEN);
-        List<Assignment> assignments = assignmentReader.listCourseAssignments(new ListCourseAssignmentsOptions(ecrCourse.getId().toString()));
-        AssignmentWriter assignmentWriter = (AssignmentWriter) apiFactory.getWriter(AssignmentWriter.class, ECR_TOKEN);
-        AssignmentReader edAssingmentReader = (AssignmentReader) edhesiveFactory.getReader(AssignmentReader.class, PS_TOKEN);
-        List<Assignment> edAssignments = edAssingmentReader.listCourseAssignments(new ListCourseAssignmentsOptions(edhesiveCourse.getId().toString()));
+        assignmentReader = (AssignmentReader) apiFactory.getReader(AssignmentReader.class, ECR_TOKEN);
+        assignments = assignmentReader.listCourseAssignments(new ListCourseAssignmentsOptions(ecrCourse.getId().toString()));
 
-        HashMap<Integer, Integer> userMap = null;
+        edAssingmentReader = (AssignmentReader) edhesiveFactory.getReader(AssignmentReader.class, PS_TOKEN);
+        edAssignments = edAssingmentReader.listCourseAssignments(new ListCourseAssignmentsOptions(edhesiveCourse.getId().toString()));
+        submissionReader = (SubmissionReader) apiFactory.getReader(SubmissionReader.class, ECR_TOKEN);
+        edSubmissionReader = (SubmissionReader) edhesiveFactory.getReader(SubmissionReader.class, PS_TOKEN);
+
+        submissionWriter = (SubmissionWriter) apiFactory.getWriter(SubmissionWriter.class, ECR_TOKEN);
+
+        submissionsMap = new HashMap<String, MultipleSubmissionsOptions.StudentSubmissionOption>();
+
+        categoryMap.put(PS_ACT_CATEGORY, ECR_ACT_CATEGORY);
+        categoryMap.put(PS_ASSIGNMENT_CATEGORY, ECR_ASSIGNMENT_CATEGORY);
+        categoryMap.put(PS_TEST_CATEGORY, ECR_TEST_CATEGORY);
 
         try {
             userMap = createUserMap();
@@ -84,27 +98,23 @@ public class TestLauncher {
             LOG.error("Unable to create User ID Map...");
 
         }
-        /**/
-        //LOG.info(edUsers.get(0).getName());
+    }
 
-        categoryMap.put(PS_ACT_CATEGORY, ECR_ACT_CATEGORY);
-        categoryMap.put(PS_ASSIGNMENT_CATEGORY, ECR_ASSIGNMENT_CATEGORY);
-        categoryMap.put(PS_TEST_CATEGORY, ECR_TEST_CATEGORY);
-        SubmissionReader submissionReader = (SubmissionReader) apiFactory.getReader(SubmissionReader.class, ECR_TOKEN);
-        SubmissionReader edSubmissionReader = (SubmissionReader) edhesiveFactory.getReader(SubmissionReader.class, PS_TOKEN);
 
-        SubmissionWriter submissionWriter = (SubmissionWriter) apiFactory.getWriter(SubmissionWriter.class, ECR_TOKEN);
+    public static void transferGrades() throws IOException {
+        initialize();
 
-        List<Submission> submissions;
-        List<Submission> edSubmissions;
-        Map<String, MultipleSubmissionsOptions.StudentSubmissionOption> submissionsMap = new HashMap<String, MultipleSubmissionsOptions.StudentSubmissionOption>();
+        /**
         try {
             quizCopier();
             LOG.info("Quizzes Successfully copied...");
         } catch (Exception e) {
             LOG.error("Unable to copy quizzes and transfer grades... ");
         }
+        **/
 
+        Collections.sort(edAssignments, Assignment.Comparators.NAME);
+        Collections.sort(assignments, Assignment.Comparators.NAME);
         for(int i = 0; i < edAssignments.size(); i++) {
             // for spring assignments
             for (String springAssignment : FIRST_SEM_ASSIGNMENTS){
@@ -115,95 +125,93 @@ public class TestLauncher {
                 }
             }
         }
+        boolean retransfer = false;
 
-
-        boolean found;
-        /**/
         for (Assignment edAssignment : edAssignments) {
-            found = false;
-            for (Assignment assignment : assignments) {
-                if (edAssignment.getName().equals(assignment.getName())) {
-                    LOG.info("Matching Assignment Found: " + assignment.getName());
-                    LOG.info("Category: " + assignment.getAssignmentGroupId());
-                    found = true;
-                    edSubmissions = edSubmissionReader.getCourseSubmissions(
-                            new GetSubmissionsOptions(PS_COURSE_ID, edAssignment.getId())
-                    );
-                    submissions = submissionReader.getCourseSubmissions(
-                            new GetSubmissionsOptions(ECR_COURSE_ID, assignment.getId())
-                    );
-
-                    for (Submission edSubmission : edSubmissions) {
-                        boolean newScore = true;
-                        for (Submission submission : submissions) {
-                            if (submission.getUserId().equals(userMap.get(edSubmission.getUserId()))) {
-                                if (edSubmission.getGrade() != null && submission.getGrade() != null) {
-                                    if (submission.getScore() != edSubmission.getScore()) {
-                                        newScore = false;
-                                        submissions.remove(submission);
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                        if(edSubmission.getGrade() != null && newScore){
-                            LOG.info("New score found for user: " + userMap.get(edSubmission.getUserId()));
-                            LOG.info("Score: " + edSubmission.getScore());
-                            edSubmission.setMissing(false);
-
-                            try {
-                                submissionsMap.put(userMap.get(edSubmission.getUserId()).toString(),
-                                        new MultipleSubmissionsOptions(ECR_COURSE_ID, assignment.getId(), null)
-                                                .createStudentSubmissionOption("To be completed in Project Stem",
-                                                        edSubmission.getGrade(),
-                                                        false, false,
-                                                        "", "")
-                                );
-                            }
-                            catch (NullPointerException e) {
-                                LOG.error("Error mapping student submissions. Likely user dropped course");
-                                LOG.error(e.getMessage());
-                            }
-
-                        }
-                    }
-                    if (!submissionsMap.isEmpty()) {
-
-                        try {
-                            submissionWriter.gradeMultipleSubmissionsByCourse(new MultipleSubmissionsOptions(
-                                    ECR_COURSE_ID, assignment.getId(), submissionsMap
-                                    )
-                            );
-
-                            LOG.info("Scores Written " + assignment.getName());
-                        } catch (Exception e) {
-                            LOG.error("Error Writing Grades : " + e.getMessage());
-                        }
-
-                        submissionsMap = new HashMap<String, MultipleSubmissionsOptions.StudentSubmissionOption>();
-                    }
+             int index = Collections.binarySearch(
+                     assignments,
+                     edAssignment,
+                     Assignment.Comparators.NAME
+             );
+             Assignment assignment = index >= 0 ? assignments.get(index) : null;
+             if (assignment != null) {
+                 LOG.info("Matching Assignment Found: " + assignment.getName());
+                 LOG.info("Category: " + assignment.getAssignmentGroupId());
+                 edSubmissions = edSubmissionReader.getCourseSubmissions(
+                         new GetSubmissionsOptions(PS_COURSE_ID, edAssignment.getId())
+                         );
+                 submissions = submissionReader.getCourseSubmissions(
+                         new GetSubmissionsOptions(ECR_COURSE_ID, assignment.getId())
+                 );
+                 edSubmissions.removeIf((edSubmission) ->
+                         edSubmission.getGrade() == null
+                 );
+                 for (Submission submission : submissions) {
+                     edSubmissions.removeIf((edSubmission) ->
+                             submission.getUserId().equals(userMap.get(edSubmission.getUserId()))
+                             && submission.getGrade() != null
+                             && submission.getScore() >= edSubmission.getScore()
+                     );
+                 }
+                for (Submission edSubmission : edSubmissions)
+                    ecrSubmissionWriter(edSubmission, assignment);
+                if(!submissionsMap.isEmpty()) {
+                    ecrPostSubmissions(assignment);
                 }
-            }
-
-            if (!found) {
-                LOG.info("Assignment match not Found: " + edAssignment.getName());
-                edAssignment.setAssignmentGroupId(categoryMap.get(edAssignment.getAssignmentGroupId()));
-                //edAssignment.setLockAt(edAssignment.getDueAt());
-                edAssignment.setPostToSis(true);
-
-                try {
-                    assignmentWriter.createAssignment(ECR_COURSE_ID, edAssignment);
-                    LOG.info("Assignment created: " + edAssignment.getName());
-
-                } catch (Exception e) {
-                    LOG.error("Assignment can't be created " + edAssignment.getName());
-                }
-
-            }
+                submissionsMap = new HashMap<String, MultipleSubmissionsOptions.StudentSubmissionOption>();
+             } else {
+                 ecrAssignmentCreator(edAssignment);
+                 retransfer = true;
+             }
         }
-        /**/
+        LOG.info("\n====\nWill Re transfer Grades?: " + retransfer);
+        if (retransfer) transferGrades();
 
-        /**/
+    }
+
+    public static void ecrAssignmentCreator(Assignment edAssignment) {
+        AssignmentWriter assignmentWriter = (AssignmentWriter) apiFactory.getWriter(AssignmentWriter.class, ECR_TOKEN);
+        LOG.info("Assignment match not Found: " + edAssignment.getName());
+        edAssignment.setAssignmentGroupId(categoryMap.get(edAssignment.getAssignmentGroupId()));
+        edAssignment.setPostToSis(true);
+
+        try {
+           assignmentWriter.createAssignment(ECR_COURSE_ID, edAssignment);
+            LOG.info("Assignment created: " + edAssignment.getName());
+
+        } catch (Exception e) {
+            LOG.error("Assignment can't be created " + edAssignment.getName());
+        }
+    }
+
+    public static void ecrSubmissionWriter(Submission edSubmission, Assignment assignment) {
+        try {
+            LOG.info("New score found for user: " + userMap.get(edSubmission.getUserId()));
+            LOG.info("Score: " + edSubmission.getGrade());
+            submissionsMap.put(userMap.get(edSubmission.getUserId()).toString(),
+                    new MultipleSubmissionsOptions(ECR_COURSE_ID, assignment.getId(), null)
+                            .createStudentSubmissionOption("To be completed in Project Stem",
+                                    edSubmission.getGrade(),
+                                    false, false,
+                                    "", "")
+            );
+        }
+        catch (NullPointerException e) {
+            LOG.error("Error mapping student submissions. Likely user dropped course");
+            LOG.error(e.getMessage());
+        }
+    }
+
+    public static void ecrPostSubmissions(Assignment assignment) {
+        try {
+            submissionWriter.gradeMultipleSubmissionsByCourse(new MultipleSubmissionsOptions(
+                            ECR_COURSE_ID, assignment.getId(), submissionsMap
+                    )
+            );
+            LOG.info("Scores Written " + assignment.getName());
+        } catch (Exception e) {
+            LOG.error("Error Writing Grades : " + e.getMessage());
+        }
     }
 
     public static void quizCopier() throws IOException {
@@ -309,7 +317,6 @@ public class TestLauncher {
 
     private static HashMap<Integer,Integer> createUserMap() throws  IOException{
         CanvasApiFactory apiFactory = new CanvasApiFactory(ECR_URL);
-
         CanvasApiFactory edhesiveFactory = new CanvasApiFactory(PS_URL);
 
         LOG.info("Retrieving users...");
