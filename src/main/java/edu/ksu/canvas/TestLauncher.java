@@ -104,19 +104,20 @@ public class TestLauncher {
     public static void transferGrades() throws IOException {
         initialize();
 
-        /**
+
         try {
             quizCopier();
             LOG.info("Quizzes Successfully copied...");
         } catch (Exception e) {
             LOG.error("Unable to copy quizzes and transfer grades... ");
         }
-        **/
+
 
         Collections.sort(edAssignments, Assignment.Comparators.NAME);
         Collections.sort(assignments, Assignment.Comparators.NAME);
         for(int i = 0; i < edAssignments.size(); i++) {
             // for spring assignments
+
             for (String springAssignment : FIRST_SEM_ASSIGNMENTS){
                 if (!edAssignments.get(i).isPublished() || edAssignments.get(i).getName().startsWith(springAssignment)) {
                     edAssignments.remove(i);
@@ -164,7 +165,7 @@ public class TestLauncher {
                  retransfer = true;
              }
         }
-        LOG.info("\n====\nWill Re transfer Grades?: " + retransfer);
+        LOG.info("\n====\nWill Re transfer Grades?: " + retransfer + "\n====");
         if (retransfer) transferGrades();
 
     }
