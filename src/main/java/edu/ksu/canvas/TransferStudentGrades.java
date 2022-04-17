@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+
 
 // Static imports to protect sensitive data
 import static edu.ksu.canvas.Tokens.PS_TOKEN;
@@ -28,17 +28,14 @@ import static edu.ksu.canvas.Tokens.PS_TEST_CATEGORY;
 import static edu.ksu.canvas.Tokens.FIRST_SEM_ASSIGNMENTS;
 
 /**
- * A class with a main method that executes a couple of simple read-only requests
- * to the Canvas API. Intended as an example of how to use the library and an
- * easy place to write simple tests when developing.
- *
- * When executing the main method, you must pass in the Canvas base URL and a
- * manually generated API access token which you can get from your Canvas user
- * settings page.
+ * Main class with the main method
+ * Will transfer grades from Project Stem canvas instance to the ECR canvas instance
+ * Transfer requires the API tokens updated in the tokens class,
+ * Don't forget to reset the FIRST_SEM_ASSIGNMENTS  list in the fall
  */
-public class TestLauncher {
+public class TransferStudentGrades {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TestLauncher.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TransferStudentGrades.class);
     private static HashMap<Long,Long> categoryMap = new HashMap<>(3);
     private static CanvasApiFactory apiFactory;
     private static CourseReader courseReader;
@@ -94,16 +91,14 @@ public class TestLauncher {
 
         try {
             userMap = createUserMap();
-        } catch (Exception e) {
-            LOG.error("Unable to create User ID Map...");
+        } catch (IOException e) {
+            LOG.error("Unable to create User ID Map..." + e.getStackTrace());
 
         }
     }
 
-
     public static void transferGrades() throws IOException {
         initialize();
-
 
         try {
             quizCopier();
@@ -112,21 +107,16 @@ public class TestLauncher {
             LOG.error("Unable to copy quizzes and transfer grades... ");
         }
 
+        FIRST_SEM_ASSIGNMENTS.forEach(spring ->
+                edAssignments.removeIf(assignment ->
+                        !assignment.isPublished() || assignment.getName().startsWith(spring)
+                )
+        );
 
-        Collections.sort(edAssignments, Assignment.Comparators.NAME);
-        Collections.sort(assignments, Assignment.Comparators.NAME);
-        for(int i = 0; i < edAssignments.size(); i++) {
-            // for spring assignments
-
-            for (String springAssignment : FIRST_SEM_ASSIGNMENTS){
-                if (!edAssignments.get(i).isPublished() || edAssignments.get(i).getName().startsWith(springAssignment)) {
-                    edAssignments.remove(i);
-                    i--;
-                    break;
-                }
-            }
-        }
-        boolean retransfer = false;
+        edAssignments.sort(Assignment.Comparators.NAME);
+        assignments.sort(Assignment.Comparators.NAME);
+        
+        boolean remaster = false;
 
         for (Assignment edAssignment : edAssignments) {
              int index = Collections.binarySearch(
@@ -134,7 +124,9 @@ public class TestLauncher {
                      edAssignment,
                      Assignment.Comparators.NAME
              );
+
              Assignment assignment = index >= 0 ? assignments.get(index) : null;
+
              if (assignment != null) {
                  LOG.info("Matching Assignment Found: " + assignment.getName());
                  LOG.info("Category: " + assignment.getAssignmentGroupId());
@@ -162,11 +154,11 @@ public class TestLauncher {
                 submissionsMap = new HashMap<String, MultipleSubmissionsOptions.StudentSubmissionOption>();
              } else {
                  ecrAssignmentCreator(edAssignment);
-                 retransfer = true;
+                 remaster = true;
              }
         }
-        LOG.info("\n====\nWill Re transfer Grades?: " + retransfer + "\n====");
-        if (retransfer) transferGrades();
+        LOG.info("\n====\nWill Remaster Grades?: " + remaster + "\n====");
+        if (remaster) transferGrades();
 
     }
 
@@ -229,17 +221,11 @@ public class TestLauncher {
         List<Quiz> quizzes = quizReader.getQuizzesInCourse(ECR_COURSE_ID);
         List<Quiz> edQuizzes = edQuizReader.getQuizzesInCourse(PS_COURSE_ID);
 
-
-        for(int i = 0; i < edQuizzes.size(); i++) {
-            for (String springAssignment : FIRST_SEM_ASSIGNMENTS){
-                if (!edQuizzes.get(i).getPublished()|| edQuizzes.get(i).getTitle().startsWith(springAssignment)) {
-                    edQuizzes.remove(i);
-                    i--;
-                    break;
-                }
-            }
-        }
-
+        FIRST_SEM_ASSIGNMENTS.forEach(spring ->
+                quizzes.removeIf(quiz ->
+                        !quiz.getPublished() || quiz.getTitle().startsWith(spring)
+                )
+        );
 
         for(Quiz edQuiz : edQuizzes) {
             for(Quiz quiz : quizzes) {
@@ -254,10 +240,12 @@ public class TestLauncher {
             }
         }
 
+
+
         LOG.info("Quizzes Updated");
 
     }
-
+    // This method should work, but I don't have the permissions to submit quiz answers for students
     private static void transferQuizSubmissions( Quiz edQuiz, Quiz quiz) throws IOException{
 
         CanvasApiFactory apiFactory = new CanvasApiFactory(ECR_URL);
@@ -289,29 +277,28 @@ public class TestLauncher {
                     break;
                 }
             }
-
+            /**
+             * This needs work to ensure that ecrCourseID is working
             if(edSubmission.getScore() != null && newScore){
                 LOG.info("New quiz score found for user: " + userMap.get(edSubmission.getUserId()));
                 LOG.info("Score: " + edSubmission.getScore());
                 Optional<QuizSubmission> submissionOptional = quizsubmissionWriter.startQuizSubmission(new StartQuizSubmissionOptions(ECR_COURSE_ID,quiz.getId()));
                 if (submissionOptional.isPresent()) {
                     LOG.info("Creating new submission...");
-
-                    /**
                     quizsubmissionWriter.completeQuizSubmission(
                             new CompleteQuizSubmissionOptions(
-                                    ecrCourseId,
+                                    ecrCourseId,   // fix this line
                                     quiz.getId(),
                                     submissionOptional.get().getSubmissionId(),
                                     submissionOptional.get().getAttempt(),
                                     submissionOptional.get().getValidationToken()
                             )
                     );
-                     /**/
+
                 }
+             **/
 
             }
-            /**/
         }
         LOG.info("Quiz Submissions: " + quizSubmissions.toString());
     }
@@ -329,17 +316,23 @@ public class TestLauncher {
 
         LOG.info("Creating User ID Map...");
         HashMap<Integer, Integer> userMap = new HashMap<>();
+/*
+        for (User edUser : edUsers) {
+            userMap.put(edUser.getId(), users.stream().filter(user ->
+                    user.getEmail() == edUser.getLoginId()).findFirst().orElse(new User()).getId()
+            );
+        }
+/**/
         for (User user : users) {
-            for (int i = 0; i < edUsers.size(); i++) {
-                User edUser = edUsers.get(i);
+            for (User edUser : edUsers) {
                 if (edUser.getLoginId().equals(user.getEmail())) {
                     // LOG.info(user.getEmail());
                     userMap.put(edUser.getId(), user.getId());
-                    edUsers.remove(i);
                     break;
                 }
             }
         }
+/**/
         return userMap;
     }
 }

@@ -33,6 +33,7 @@ public class User extends BaseCanvasModel implements Serializable {
     private String bio;
 
     public User() {
+        this.id = 0000;
     }
 
     public User(User other) {
